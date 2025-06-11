@@ -35,12 +35,13 @@ green_text "请输入要生成证书的域名: "
 read DOMAIN
 
 # 提示用户选择验证方式
-echo "请选择验证方式:"
+green_text "请选择验证方式:"
 echo "1) 临时 HTTP (standalone)"
 echo "2) Web 目录验证 (webroot)"
 echo "3) DNS 验证 (域名解析)"
 echo "4) Cloudflare API 验证"
-read -p "输入选择(1/2/3/4): " METHOD_CHOICE
+green_text "输入选择 (1/2/3/4): "
+read METHOD_CHOICE
 
 if [ "$METHOD_CHOICE" -eq 1 ]; then
     METHOD="--standalone $IP_MODE"
@@ -55,7 +56,7 @@ elif [ "$METHOD_CHOICE" -eq 2 ]; then
 elif [ "$METHOD_CHOICE" -eq 3 ]; then
     # 获取需要添加的 TXT 记录值
     green_text "正在获取需要配置的 DNS TXT 记录值..."
-    OUTPUT=$(/root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns --debug 2>&1 | tee /tmp/dns_output.log)
+    /root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns $IP_MODE --debug > /tmp/dns_output.log 2>&1
     RECORD_VALUE=$(grep -oP '(?<=_acme-challenge\.'"$DOMAIN"'\. ).*' /tmp/dns_output.log | head -1)
 
     if [ -z "$RECORD_VALUE" ]; then
@@ -76,14 +77,20 @@ elif [ "$METHOD_CHOICE" -eq 3 ]; then
 elif [ "$METHOD_CHOICE" -eq 4 ]; then
     # 检查 Cloudflare API 环境变量
     if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
+        green_text "Cloudflare API 环境变量未设置，请输入所需信息。"
         green_text "请输入 Cloudflare API Token: "
         read CF_Token
         green_text "请输入 Cloudflare Account ID: "
         read CF_Account_ID
+        if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
+            green_text "输入为空，无法继续，请重新配置 Cloudflare API 环境变量后重试。"
+            exit 1
+        fi
         export CF_Token
         export CF_Account_ID
+    else
+        green_text "Cloudflare API 环境变量已设置，跳过输入步骤。"
     fi
-    green_text "Cloudflare API 验证已准备好。"
     METHOD="--dns dns_cf"
 else
     green_text "无效选择，退出。"
