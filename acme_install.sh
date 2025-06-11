@@ -8,9 +8,9 @@ if [ ! -f "/root/.acme.sh/acme.sh" ]; then
 fi
 
 # 提示用户选择验证方式
-echo -e "\033[31m请选择验证方式:\033[0m"
-echo -e "\033[31m1) 临时 HTTP (standalone)\033[0m"
-echo -e "\033[31m2) Cloudflare API 验证\033[0m"
+echo -e "\033[32m请选择验证方式:\033[0m"
+echo -e "\033[32m1) 临时 HTTP (standalone)\033[0m"
+echo -e "\033[32m2) Cloudflare API 验证\033[0m"
 read -p "输入选择 (1/2): " METHOD_CHOICE
 
 # 提示用户输入域名
