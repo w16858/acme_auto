@@ -18,7 +18,8 @@ fi
 green_text "请选择网络协议版本:"
 echo "1) IPv4"
 echo "2) IPv6"
-read -p "$(green_text '输入选择(1/2): ')" PROTOCOL_CHOICE
+green_text "输入选择(1/2): "
+read PROTOCOL_CHOICE
 
 if [ "$PROTOCOL_CHOICE" -eq 1 ]; then
     IP_MODE="--listen-v4"
@@ -30,9 +31,93 @@ else
 fi
 
 # 提示用户输入域名
-read -p "$(green_text '请输入要生成证书的域名: ')" DOMAIN
+green_text "请输入要生成证书的域名: "
+read DOMAIN
 
 # 提示用户选择验证方式
 green_text "请选择验证方式:"
 echo "1) 临时 HTTP (standalone)"
-echo "2) We
+echo "2) Web 目录验证 (webroot)"
+echo "3) DNS 验证 (域名解析)"
+echo "4) Cloudflare API 验证"
+green_text "输入选择(1/2/3/4): "
+read METHOD_CHOICE
+
+if [ "$METHOD_CHOICE" -eq 1 ]; then
+    METHOD="--standalone $IP_MODE"
+elif [ "$METHOD_CHOICE" -eq 2 ]; then
+    green_text "请输入 Web 根目录路径: "
+    read WEBROOT_PATH
+    if [ ! -d "$WEBROOT_PATH" ]; then
+        green_text "指定的 Web 根目录不存在，退出。"
+        exit 1
+    fi
+    METHOD="-w $WEBROOT_PATH"
+elif [ "$METHOD_CHOICE" -eq 3 ]; then
+    # 获取需要添加的 TXT 记录值
+    green_text "正在获取需要配置的 DNS TXT 记录值..."
+    OUTPUT=$(/root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns --debug 2>&1 | tee /tmp/dns_output.log)
+    RECORD_VALUE=$(grep -oP '(?<=_acme-challenge\.'"$DOMAIN"'\. ).*' /tmp/dns_output.log | head -1)
+
+    if [ -z "$RECORD_VALUE" ]; then
+        green_text "获取 TXT 记录值失败，请检查日志文件: /tmp/dns_output.log"
+        exit 1
+    fi
+
+    green_text "请登录 DNS 提供商管理面板，添加以下 TXT 记录："
+    green_text "主机名: _acme-challenge.$DOMAIN"
+    green_text "值: $RECORD_VALUE"
+    green_text "完成添加后，请输入 yes 继续: "
+    read CONFIRMATION
+    if [ "$CONFIRMATION" != "yes" ]; then
+        green_text "操作取消，退出。"
+        exit 1
+    fi
+    METHOD="--dns"
+elif [ "$METHOD_CHOICE" -eq 4 ]; then
+    # 检查 Cloudflare API 环境变量
+    if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
+        green_text "请输入 Cloudflare API Token: "
+        read CF_Token
+        green_text "请输入 Cloudflare Account ID: "
+        read CF_Account_ID
+        export CF_Token
+        export CF_Account_ID
+    fi
+    green_text "Cloudflare API 验证已准备好。"
+    METHOD="--dns dns_cf"
+else
+    green_text "无效选择，退出。"
+    exit 1
+fi
+
+# 定义证书安装目录
+CERT_DIR="/root/cert/$DOMAIN"
+mkdir -p "$CERT_DIR"
+
+# 使用 acme.sh 生成证书
+green_text "开始申请证书..."
+/root/.acme.sh/acme.sh --issue -d "$DOMAIN" $METHOD
+
+if [ $? -ne 0 ]; then
+    green_text "证书申请失败，请检查错误信息。"
+    exit 1
+fi
+
+# 安装证书到指定目录
+green_text "安装证书到目录: $CERT_DIR"
+/root/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
+--key-file "$CERT_DIR/privkey.pem" \
+--fullchain-file "$CERT_DIR/fullchain.pem"
+
+if [ $? -eq 0 ]; then
+    green_text "证书申请和安装成功！"
+    green_text "证书路径: $CERT_DIR/fullchain.pem"
+    green_text "私钥路径: $CERT_DIR/privkey.pem"
+else
+    green_text "证书安装失败，请检查错误信息。"
+    exit 1
+fi
+
+# 提示用户完成
+green_text "操作完成。"
