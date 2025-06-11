@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 输出绿色文字的函数
+# 输出绿色文字
 green_text() {
     echo -e "\033[32m$1\033[0m"
 }
@@ -54,19 +54,19 @@ elif [ "$METHOD_CHOICE" -eq 2 ]; then
     fi
     METHOD="-w $WEBROOT_PATH"
 elif [ "$METHOD_CHOICE" -eq 3 ]; then
-    # 获取需要添加的 TXT 记录值
+    # 自动获取 TXT 记录值
     green_text "正在获取需要配置的 DNS TXT 记录值..."
     /root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns $IP_MODE --debug > /tmp/dns_output.log 2>&1
-    RECORD_VALUE=$(grep -oP '(?<=_acme-challenge\.'"$DOMAIN"'\. ).*' /tmp/dns_output.log | head -1)
+    TXT_RECORD=$(grep -oP '(?<=_acme-challenge\.'"$DOMAIN"'\. ).*' /tmp/dns_output.log | head -1)
 
-    if [ -z "$RECORD_VALUE" ]; then
+    if [ -z "$TXT_RECORD" ]; then
         green_text "获取 TXT 记录值失败，请检查日志文件: /tmp/dns_output.log"
         exit 1
     fi
 
     green_text "请登录 DNS 提供商管理面板，添加以下 TXT 记录："
     green_text "主机名: _acme-challenge.$DOMAIN"
-    green_text "值: $RECORD_VALUE"
+    green_text "值: $TXT_RECORD"
     green_text "完成添加后，请输入 yes 继续: "
     read CONFIRMATION
     if [ "$CONFIRMATION" != "yes" ]; then
@@ -75,21 +75,23 @@ elif [ "$METHOD_CHOICE" -eq 3 ]; then
     fi
     METHOD="--dns"
 elif [ "$METHOD_CHOICE" -eq 4 ]; then
-    # 检查 Cloudflare API 环境变量
-    if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
+    # 检查是否已经设置了 Cloudflare API
+    if grep -q "dns_cf" ~/.acme.sh/account.conf; then
+        green_text "Cloudflare API 已设置，无需重新配置。"
+    else
         green_text "Cloudflare API 环境变量未设置，请输入所需信息。"
         green_text "请输入 Cloudflare API Token: "
         read CF_Token
         green_text "请输入 Cloudflare Account ID: "
         read CF_Account_ID
+
         if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
             green_text "输入为空，无法继续，请重新配置 Cloudflare API 环境变量后重试。"
             exit 1
         fi
         export CF_Token
         export CF_Account_ID
-    else
-        green_text "Cloudflare API 环境变量已设置，跳过输入步骤。"
+        green_text "Cloudflare API 配置成功。"
     fi
     METHOD="--dns dns_cf"
 else
@@ -125,5 +127,4 @@ else
     exit 1
 fi
 
-# 提示用户完成
 green_text "操作完成。"
