@@ -106,10 +106,12 @@ else
     exit 1
 fi
 
+
 # 添加定时任务自动续签，仅续签当前域名
-CRON_JOB="@monthly /root/.acme.sh/acme.sh --renew -d $DOMAIN --home /root/.acme.sh > /dev/null"
+CRON_JOB="@weekly /root/.acme.sh/acme.sh --renew -d $DOMAIN --home /root/.acme.sh > /dev/null"
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-echo -e "\033[32m已添加自动续签任务，每月续签域名: $DOMAIN。\033[0m"
+echo -e "\033[32m已添加自动续签任务，每周续签域名: $DOMAIN。\033[0m"
+
 
 # 提示完成
 echo -e "\033[32m操作完成。\033[0m"
