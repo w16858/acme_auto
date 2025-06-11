@@ -35,13 +35,12 @@ green_text "请输入要生成证书的域名: "
 read DOMAIN
 
 # 提示用户选择验证方式
-green_text "请选择验证方式:"
+echo "请选择验证方式:"
 echo "1) 临时 HTTP (standalone)"
 echo "2) Web 目录验证 (webroot)"
 echo "3) DNS 验证 (域名解析)"
 echo "4) Cloudflare API 验证"
-green_text "输入选择 (1/2/3/4): "
-read METHOD_CHOICE
+read -p "输入选择(1/2/3/4): " METHOD_CHOICE
 
 if [ "$METHOD_CHOICE" -eq 1 ]; then
     METHOD="--standalone $IP_MODE"
