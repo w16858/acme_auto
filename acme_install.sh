@@ -18,7 +18,7 @@ fi
 green_text "请选择网络协议版本:"
 echo "1) IPv4"
 echo "2) IPv6"
-green_text "输入选择(1/2): "
+green_text "输入选择 (1/2): "
 read PROTOCOL_CHOICE
 
 if [ "$PROTOCOL_CHOICE" -eq 1 ]; then
@@ -40,7 +40,7 @@ echo "1) 临时 HTTP (standalone)"
 echo "2) Web 目录验证 (webroot)"
 echo "3) DNS 验证 (域名解析)"
 echo "4) Cloudflare API 验证"
-green_text "输入选择(1/2/3/4): "
+green_text "输入选择 (1/2/3/4): "
 read METHOD_CHOICE
 
 if [ "$METHOD_CHOICE" -eq 1 ]; then
