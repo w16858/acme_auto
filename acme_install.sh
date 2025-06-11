@@ -1,4 +1,11 @@
 #!/bin/bash
+# 安装必要的工具
+echo -e "\033[32m安装必要的软件包...\033[0m"
+sudo apt update && sudo apt install -y dnsutils curl wget sudo cron
+
+# 启用并启动 cron 服务
+sudo systemctl enable cron
+sudo systemctl start cron
 
 # 检查并安装 acme.sh
 if [ ! -f "/root/.acme.sh/acme.sh" ]; then
