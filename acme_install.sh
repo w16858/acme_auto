@@ -54,28 +54,34 @@ elif [ "$METHOD_CHOICE" -eq 2 ]; then
     fi
     METHOD="-w $WEBROOT_PATH"
 elif [ "$METHOD_CHOICE" -eq 3 ]; then
-    # 自动获取 TXT 记录值
     green_text "正在获取需要配置的 DNS TXT 记录值..."
     /root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns $IP_MODE --debug > /tmp/dns_output.log 2>&1
-    TXT_RECORD=$(grep -oP '(?<=_acme-challenge\.'"$DOMAIN"'\. ).*' /tmp/dns_output.log | head -1)
-
+    
+    TXT_RECORD=$(grep -oP "(?<=_acme-challenge\.$DOMAIN.*TXT value is: )[^ ]+" /tmp/dns_output.log)
+    
     if [ -z "$TXT_RECORD" ]; then
         green_text "获取 TXT 记录值失败，请检查日志文件: /tmp/dns_output.log"
         exit 1
     fi
-
+    
     green_text "请登录 DNS 提供商管理面板，添加以下 TXT 记录："
     green_text "主机名: _acme-challenge.$DOMAIN"
     green_text "值: $TXT_RECORD"
-    green_text "完成添加后，请输入 yes 继续: "
+    green_text "完成添加后，请输入 yes 确认继续: "
     read CONFIRMATION
     if [ "$CONFIRMATION" != "yes" ]; then
         green_text "操作取消，退出。"
         exit 1
     fi
+    
+    green_text "正在验证 DNS TXT 记录..."
+    /root/.acme.sh/acme.sh --renew --force -d "$DOMAIN" --dns $IP_MODE --debug
+    if [ $? -ne 0 ]; then
+        green_text "DNS 验证失败，请检查 DNS 配置或联系管理员。"
+        exit 1
+    fi
     METHOD="--dns"
 elif [ "$METHOD_CHOICE" -eq 4 ]; then
-    # 检查是否已经设置了 Cloudflare API
     if grep -q "dns_cf" ~/.acme.sh/account.conf; then
         green_text "Cloudflare API 已设置，无需重新配置。"
     else
@@ -84,7 +90,7 @@ elif [ "$METHOD_CHOICE" -eq 4 ]; then
         read CF_Token
         green_text "请输入 Cloudflare Account ID: "
         read CF_Account_ID
-
+        
         if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
             green_text "输入为空，无法继续，请重新配置 Cloudflare API 环境变量后重试。"
             exit 1
@@ -127,4 +133,9 @@ else
     exit 1
 fi
 
+# 添加自动续签任务
+green_text "正在添加自动续签任务..."
+(crontab -l 2>/dev/null; echo "0 3 */30 * * /root/.acme.sh/acme.sh --renew -d $DOMAIN --quiet") | crontab -
+
+green_text "自动续签任务已添加，每 30 天将尝试续签该域名证书。"
 green_text "操作完成。"
