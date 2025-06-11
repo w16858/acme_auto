@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # 检查并安装 acme.sh
-if ! command -v acme.sh &>/dev/null; then
+if [ ! -f "/root/.acme.sh/acme.sh" ]; then
     echo "acme.sh 未安装，正在安装..."
     curl https://get.acme.sh | sh
     source ~/.bashrc
 fi
 
 # 提示用户选择验证方式
-echo -e "\033[32m请选择验证方式:\033[0m"
-echo "1) 临时 HTTP (standalone)"
-echo "2) Cloudflare API 验证"
+echo -e "\033[31m请选择验证方式:\033[0m"
+echo -e "\033[31m1) 临时 HTTP (standalone)\033[0m"
+echo -e "\033[31m2) Cloudflare API 验证\033[0m"
 read -p "输入选择 (1/2): " METHOD_CHOICE
 
 # 提示用户输入域名
@@ -33,19 +33,16 @@ fi
 # 定义验证方式
 if [ "$METHOD_CHOICE" -eq 1 ]; then
     # 自动检测域名类型（A 或 AAAA）
-    IPV4_MODE="--listen-v4"
-    IPV6_MODE="--listen-v6"
-
     echo -e "\033[32m正在检测域名解析记录...\033[0m"
     A_RECORD=$(dig +short A "$DOMAIN")
     AAAA_RECORD=$(dig +short AAAA "$DOMAIN")
 
     if [ -n "$A_RECORD" ]; then
-        echo -e "\033[32m检测到 A 记录 (IPv4)，使用 IPv4 模式。\033[0m"
-        METHOD="--standalone $IPV4_MODE"
+        echo -e "\033[32m检测到 A 记录 (IPv4): $A_RECORD\033[0m"
+        METHOD="--standalone --listen-v4"
     elif [ -n "$AAAA_RECORD" ]; then
-        echo -e "\033[32m检测到 AAAA 记录 (IPv6)，使用 IPv6 模式。\033[0m"
-        METHOD="--standalone $IPV6_MODE"
+        echo -e "\033[32m检测到 AAAA 记录 (IPv6): $AAAA_RECORD\033[0m"
+        METHOD="--standalone --listen-v6"
     else
         echo -e "\033[31m未检测到有效的 A 或 AAAA 记录，请检查域名解析。\033[0m"
         exit 1
@@ -97,10 +94,10 @@ else
     exit 1
 fi
 
-# 添加定时任务自动续签
-CRON_JOB="@daily /root/.acme.sh/acme.sh --cron --home /root/.acme.sh > /dev/null"
+# 添加定时任务自动续签，仅续签当前域名
+CRON_JOB="@monthly /root/.acme.sh/acme.sh --renew -d $DOMAIN --home /root/.acme.sh > /dev/null"
 (crontab -l 2>/dev/null | grep -F "$CRON_JOB") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-echo -e "\033[32m已添加自动续签任务，每天检查证书是否需要续签。\033[0m"
+echo -e "\033[32m已添加自动续签任务，每月续签域名: $DOMAIN。\033[0m"
 
 # 提示完成
 echo -e "\033[32m操作完成。\033[0m"
