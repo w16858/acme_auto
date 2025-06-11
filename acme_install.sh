@@ -62,7 +62,7 @@ mkdir -p "$CERT_DIR"
 
 # 使用 acme.sh 生成证书
 echo "开始申请证书..."
-acme.sh --issue -d "$DOMAIN" $METHOD
+/root/.acme.sh/acme.sh --issue -d "$DOMAIN" $METHOD
 
 if [ $? -ne 0 ]; then
     echo "证书申请失败，请检查错误信息。"
