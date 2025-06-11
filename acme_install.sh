@@ -20,6 +20,11 @@ echo -e "\033[32m1) HTTP(80端口) \033[0m"
 echo -e "\033[32m2) Cloudflare API \033[0m"
 read -p "输入选择 (1/2): " METHOD_CHOICE
 
+# 检查用户选择是否有效
+if [[ "$METHOD_CHOICE" != "1" && "$METHOD_CHOICE" != "2" ]]; then
+    echo -e "\033[31m无效选择，操作已取消。\033[0m"
+    exit 1
+fi
 # 提示用户输入域名
 read -p "请输入要生成证书的域名: " DOMAIN
 
