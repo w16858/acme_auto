@@ -14,91 +14,68 @@ else
     green_text "acme.sh 已安装，跳过安装步骤。"
 fi
 
-# 提示用户选择网络协议版本
-green_text "请选择网络协议版本:"
-echo "1) IPv4"
-echo "2) IPv6"
-green_text "输入选择 (1/2): "
-read PROTOCOL_CHOICE
-
-if [ "$PROTOCOL_CHOICE" -eq 1 ]; then
-    IP_MODE="--listen-v4"
-elif [ "$PROTOCOL_CHOICE" -eq 2 ]; then
-    IP_MODE="--listen-v6"
-else
-    green_text "无效选择，退出。"
-    exit 1
-fi
-
 # 提示用户输入域名
 green_text "请输入要生成证书的域名: "
 read DOMAIN
 
 # 提示用户选择验证方式
 green_text "请选择验证方式:"
-echo "1) 临时 HTTP (standalone)"
-echo "2) Web 目录验证 (webroot)"
-echo "3) DNS 验证 (域名解析)"
-echo "4) Cloudflare API 验证"
-green_text "输入选择 (1/2/3/4): "
-read METHOD_CHOICE
+echo "1) 临时 HTTP 验证 (standalone)"
+echo "2) Cloudflare API 验证"
+read -p "输入选择 (1/2): " METHOD_CHOICE
 
 if [ "$METHOD_CHOICE" -eq 1 ]; then
-    METHOD="--standalone $IP_MODE"
-elif [ "$METHOD_CHOICE" -eq 2 ]; then
-    green_text "请输入 Web 根目录路径: "
-    read WEBROOT_PATH
-    if [ ! -d "$WEBROOT_PATH" ]; then
-        green_text "指定的 Web 根目录不存在，退出。"
-        exit 1
-    fi
-    METHOD="-w $WEBROOT_PATH"
-elif [ "$METHOD_CHOICE" -eq 3 ]; then
-    green_text "正在获取需要配置的 DNS TXT 记录值..."
-    /root/.acme.sh/acme.sh --issue -d "$DOMAIN" --dns $IP_MODE --debug > /tmp/dns_output.log 2>&1
-    
-    TXT_RECORD=$(grep -oP "(?<=_acme-challenge\.$DOMAIN.*TXT value is: )[^ ]+" /tmp/dns_output.log)
-    
-    if [ -z "$TXT_RECORD" ]; then
-        green_text "获取 TXT 记录值失败，请检查日志文件: /tmp/dns_output.log"
-        exit 1
-    fi
-    
-    green_text "请登录 DNS 提供商管理面板，添加以下 TXT 记录："
-    green_text "主机名: _acme-challenge.$DOMAIN"
-    green_text "值: $TXT_RECORD"
-    green_text "完成添加后，请输入 yes 确认继续: "
-    read CONFIRMATION
-    if [ "$CONFIRMATION" != "yes" ]; then
-        green_text "操作取消，退出。"
-        exit 1
-    fi
-    
-    green_text "正在验证 DNS TXT 记录..."
-    /root/.acme.sh/acme.sh --renew --force -d "$DOMAIN" --dns $IP_MODE --debug
-    if [ $? -ne 0 ]; then
-        green_text "DNS 验证失败，请检查 DNS 配置或联系管理员。"
-        exit 1
-    fi
-    METHOD="--dns"
-elif [ "$METHOD_CHOICE" -eq 4 ]; then
-    if grep -q "dns_cf" ~/.acme.sh/account.conf; then
-        green_text "Cloudflare API 已设置，无需重新配置。"
+    # 自动检测域名解析类型 (A 或 AAAA)
+    green_text "正在检查域名解析记录..."
+    IPV4=$(dig +short A "$DOMAIN")
+    IPV6=$(dig +short AAAA "$DOMAIN")
+
+    if [ -n "$IPV4" ]; then
+        IP_MODE="--listen-v4"
+        green_text "检测到域名使用 IPv4 (A 记录): $IPV4"
+    elif [ -n "$IPV6" ]; then
+        IP_MODE="--listen-v6"
+        green_text "检测到域名使用 IPv6 (AAAA 记录): $IPV6"
     else
-        green_text "Cloudflare API 环境变量未设置，请输入所需信息。"
-        green_text "请输入 Cloudflare API Token: "
-        read CF_Token
-        green_text "请输入 Cloudflare Account ID: "
-        read CF_Account_ID
-        
-        if [ -z "$CF_Token" ] || [ -z "$CF_Account_ID" ]; then
-            green_text "输入为空，无法继续，请重新配置 Cloudflare API 环境变量后重试。"
-            exit 1
-        fi
-        export CF_Token
-        export CF_Account_ID
-        green_text "Cloudflare API 配置成功。"
+        green_text "未检测到有效的 A 或 AAAA 记录，请先确保域名正确解析后重试。"
+        exit 1
     fi
+
+    green_text "请输入临时 HTTP 验证端口（默认80端口）: "
+    read HTTP_PORT
+    if [ -z "$HTTP_PORT" ]; then
+        HTTP_PORT=80
+    fi
+
+    METHOD="--standalone $IP_MODE --httpport $HTTP_PORT"
+
+elif [ "$METHOD_CHOICE" -eq 2 ]; then
+    # Cloudflare API 验证
+    green_text "使用 Cloudflare API 验证，请确保环境变量已配置。"
+
+    # 检查现有的 Cloudflare API 信息
+    if [ -f ~/.acme.sh/account.conf ]; then
+        CF_TOKEN=$(grep "^export CF_Token" ~/.acme.sh/account.conf | cut -d '"' -f 2)
+        CF_ACCOUNT_ID=$(grep "^export CF_Account_ID" ~/.acme.sh/account.conf | cut -d '"' -f 2)
+    fi
+
+    # 提示用户输入缺失的信息
+    if [ -z "$CF_TOKEN" ]; then
+        green_text "未检测到 Cloudflare API Token，请输入:"
+        read -p "CF_Token: " CF_TOKEN
+        export CF_Token="$CF_TOKEN"
+    else
+        green_text "已检测到 Cloudflare API Token，跳过输入。"
+    fi
+
+    if [ -z "$CF_ACCOUNT_ID" ]; then
+        green_text "未检测到 Cloudflare Account ID，请输入:"
+        read -p "CF_Account_ID: " CF_ACCOUNT_ID
+        export CF_Account_ID="$CF_ACCOUNT_ID"
+    else
+        green_text "已检测到 Cloudflare Account ID，跳过输入。"
+    fi
+
     METHOD="--dns dns_cf"
 else
     green_text "无效选择，退出。"
