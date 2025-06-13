@@ -84,6 +84,7 @@ mkdir -p "$CERT_DIR"
 
 # 开始申请证书
 echo -e "\033[32m开始申请证书...\033[0m"
+/root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
 /root/.acme.sh/acme.sh --issue -d "$DOMAIN" $METHOD
 
 if [ $? -ne 0 ]; then
